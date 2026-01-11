@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code API</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            padding: 30px;
+            max-width: 600px;
+            width: 100%;
+        }
+        h1 { color: #333; margin-bottom: 20px; font-size: 24px; }
+        .qr-output { text-align: center; margin: 20px 0; }
+        canvas { max-width: 100%; height: auto; }
+        .meta {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 14px;
+            color: #666;
+            margin-top: 20px;
+        }
+        .meta code { background: #e9ecef; padding: 2px 6px; border-radius: 4px; }
+        .error {
+            background: #fee;
+            color: #c00;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .docs { margin-top: 30px; }
+        .docs h2 { font-size: 18px; margin-bottom: 15px; color: #333; }
+        .docs table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        .docs th, .docs td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .docs th { background: #f8f9fa; }
+        .example {
+            background: #f0f7ff;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        a { color: #667eea; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>QR Code API</h1>
+
+        <div id="output"></div>
+
+        <div class="docs" id="docs">
+            <h2>Usage</h2>
+            <p>Add query parameters to generate a QR code:</p>
+            <div class="example">api/?data=https://example.com</div>
+
+            <h2>Parameters</h2>
+            <table>
+                <tr><th>Parameter</th><th>Description</th><th>Default</th></tr>
+                <tr><td><code>data</code></td><td>Text or URL to encode (required)</td><td>-</td></tr>
+                <tr><td><code>ecc</code></td><td>Error correction: L, M, Q, H</td><td>M</td></tr>
+                <tr><td><code>size</code></td><td>Module size in pixels (1-20)</td><td>8</td></tr>
+                <tr><td><code>download</code></td><td>Auto-download as PNG (1 or filename)</td><td>-</td></tr>
+                <tr><td><code>format</code></td><td>Output: html, png, json</td><td>html</td></tr>
+            </table>
+
+            <h2>Examples</h2>
+            <div class="example"><a href="?data=Hello%20World">?data=Hello World</a></div>
+            <div class="example"><a href="?data=https://github.com&ecc=H&size=10">?data=https://github.com&ecc=H&size=10</a></div>
+            <div class="example"><a href="?data=test&download=qr.png">?data=test&download=qr.png</a></div>
+            <div class="example"><a href="?data=test&format=json">?data=test&format=json</a> (returns JSON metadata)</div>
+
+            <h2>Embed in Your Page</h2>
+            <div class="example">&lt;img src="https://rogerlew.github.io/js-qrcode-cc/api/?data=YOUR_URL&format=png"&gt;</div>
+
+            <p style="margin-top: 20px;"><a href="../">Back to main generator</a></p>
+        </div>
+    </div>
+
+    <script src="../qrcode.js"></script>
+    <script>
+    // API Logic
+    (function() {
+        const params = new URLSearchParams(window.location.search);
+        const data = params.get('data');
+        const ecc = (params.get('ecc') || 'M').toUpperCase();
+        const size = Math.min(20, Math.max(1, parseInt(params.get('size')) || 8));
+        const download = params.get('download');
+        const format = (params.get('format') || 'html').toLowerCase();
+
+        const output = document.getElementById('output');
+        const docs = document.getElementById('docs');
+
+        if (!data) {
+            // No data provided, show documentation
+            return;
+        }
+
+        // Hide docs when generating
+        docs.style.display = 'none';
+
+        if (!['L', 'M', 'Q', 'H'].includes(ecc)) {
+            output.innerHTML = '<div class="error">Invalid ECC level. Use L, M, Q, or H.</div>';
+            return;
+        }
+
+        try {
+            const qrData = QRCode.generate(data, ecc);
+            const canvas = document.createElement('canvas');
+            QRCode.render(canvas, qrData, size);
+
+            if (format === 'png') {
+                // Redirect to PNG data URL (for embedding in img tags)
+                window.location.href = canvas.toDataURL('image/png');
+                return;
+            }
+
+            if (format === 'json') {
+                // Return JSON metadata
+                const json = {
+                    success: true,
+                    data: data,
+                    version: qrData.version,
+                    size: qrData.size,
+                    eccLevel: qrData.eccLevel,
+                    maskPattern: qrData.maskPattern,
+                    mode: qrData.mode,
+                    dataLength: qrData.dataLength,
+                    imageDataUrl: canvas.toDataURL('image/png')
+                };
+                document.body.innerHTML = '<pre style="padding:20px;font-family:monospace;">' +
+                    JSON.stringify(json, null, 2) + '</pre>';
+                return;
+            }
+
+            // Default: HTML output
+            output.innerHTML = `
+                <div class="qr-output">
+                    <div id="canvas-container"></div>
+                </div>
+                <div class="meta">
+                    <strong>Data:</strong> <code>${data.length > 50 ? data.substring(0, 50) + '...' : data}</code><br>
+                    <strong>Version:</strong> ${qrData.version} (${qrData.size}x${qrData.size})<br>
+                    <strong>ECC:</strong> ${qrData.eccLevel} | <strong>Mode:</strong> ${qrData.mode} | <strong>Mask:</strong> ${qrData.maskPattern}
+                </div>
+                <div style="margin-top: 20px; text-align: center;">
+                    <a href="#" id="downloadLink" style="display: inline-block; padding: 10px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 6px;">Download PNG</a>
+                </div>
+            `;
+
+            document.getElementById('canvas-container').appendChild(canvas);
+
+            const downloadLink = document.getElementById('downloadLink');
+            downloadLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                const link = document.createElement('a');
+                link.download = 'qrcode.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+
+            // Auto-download if requested
+            if (download) {
+                const link = document.createElement('a');
+                link.download = download === '1' ? 'qrcode.png' : download;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+
+        } catch (e) {
+            output.innerHTML = `<div class="error"><strong>Error:</strong> ${e.message}</div>`;
+        }
+    })();
+    </script>
+</body>
+</html>
