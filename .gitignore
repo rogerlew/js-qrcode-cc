@@ -1,0 +1,10 @@
+# Playwright MCP temporary files
+.playwright-mcp/
+
+# Development/reference files
+ISO_IEC_18004_2024_Standard.md
+URL-gen-prompt.md
+functional-qrcode.png
+
+# OS files
+.DS_Store
